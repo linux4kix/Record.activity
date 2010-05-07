@@ -42,9 +42,9 @@ import utils
 import ui
 
 OGG_TRAITS = {
-        0: { 'width': 160, 'height': 120, 'quality': 16 },
-        1: { 'width': 400, 'height': 300, 'quality': 16 },
-        2: { 'width': 640, 'height': 480, 'quality': 32 } }
+        0: { 'width': 176, 'height': 144, 'quality': 16 },
+        1: { 'width': 320, 'height': 240, 'quality': 16 },
+        2: { 'width': 320, 'height': 240, 'quality': 32 } }
 
 THUMB_STUB = gtk.gdk.pixbuf_new_from_file(
     os.path.join(get_bundle_path(), 'gfx', 'stub.png'))
@@ -73,14 +73,15 @@ class Glive:
 
         self.TRANSCODE_UPDATE_INTERVAL = 200
 
+	self.OGG_DEFAULT_QUALITY = 16
 
-        self.VIDEO_WIDTH_SMALL = 160
-        self.VIDEO_HEIGHT_SMALL = 120
+        self.VIDEO_WIDTH_SMALL = 176
+        self.VIDEO_HEIGHT_SMALL = 144
         self.VIDEO_FRAMERATE_SMALL = 10
 
-        self.VIDEO_WIDTH_LARGE = 200
-        self.VIDEO_HEIGHT_LARGE = 150
-        self.VIDEO_FRAMERATE_SMALL = 10
+        self.VIDEO_WIDTH_LARGE = 320
+        self.VIDEO_HEIGHT_LARGE = 240
+        self.VIDEO_FRAMERATE_LARGE = 15
 
         self.pipeline = gst.Pipeline("my-pipeline")
         self.createPhotoBin()
@@ -162,7 +163,7 @@ class Glive:
         colorspace = gst.element_factory_make("ffmpegcolorspace", "vbcolorspace")
 
         enc = gst.element_factory_make("theoraenc", "vbenc")
-        enc.set_property("quality", 16)
+        enc.set_property("quality", self.OGG_DEFAULT_QUALITY)
 
         mux = gst.element_factory_make("oggmux", "vbmux")
 
@@ -214,9 +215,7 @@ class Glive:
         queue.set_property("max-size-buffers", 2)
 
         self.pipeline.add(src, rate, tee, queue)
-        src.link(rate, srccaps)
-        rate.link(tee, ratecaps)
-        tee.link(queue)
+        gst.element_link_many(src, srccaps, rate, ratecaps, tee, queue)
 
         xvsink = gst.element_factory_make("xvimagesink", "xvsink")
         xv_available = xvsink.set_state(gst.STATE_PAUSED) != gst.STATE_CHANGE_FAILURE
