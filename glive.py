@@ -217,6 +217,7 @@ class Glive:
         xvsink.set_state(gst.STATE_NULL)
 
         if xv_available:
+            xvsink.set_property("sync", False)
             self.pipeline.add(xvsink)
             queue.link(xvsink)
         else:
