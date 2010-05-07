@@ -153,13 +153,6 @@ class Glive:
         gst.element_link_many(rate, queue, enc, sink)
 
     def createVideoBin ( self ):
-        scale = gst.element_factory_make("videoscale", "vbscale")
-
-        scalecapsfilter = gst.element_factory_make("capsfilter", "scalecaps")
-
-        scalecaps = gst.Caps('video/x-raw-yuv,width='+str(self.VIDEO_WIDTH_SMALL)+',height='+str(self.VIDEO_HEIGHT_SMALL))
-        scalecapsfilter.set_property("caps", scalecaps)
-
         colorspace = gst.element_factory_make("ffmpegcolorspace", "vbcolorspace")
 
         enc = gst.element_factory_make("theoraenc", "vbenc")
@@ -171,20 +164,17 @@ class Glive:
         sink.set_property("location", os.path.join(Instance.instancePath, "output.ogg"))
 
         self.videobin = gst.Bin("videobin")
-        self.videobin.add(scale, scalecapsfilter, colorspace, enc, mux, sink)
+        self.videobin.add(colorspace, enc, mux, sink)
 
-        scale.link_pads(None, scalecapsfilter, "sink")
-        scalecapsfilter.link_pads("src", colorspace, None)
-        gst.element_link_many(colorspace, enc, mux, sink)
+        colorspace.link_pads("src", enc, "sink")
+        gst.element_link_many(enc, mux, sink)
 
-        pad = scale.get_static_pad("sink")
+        pad = colorspace.get_static_pad("sink")
         self.videobin.add_pad(gst.GhostPad("sink", pad))
 
-    def cfgVideoBin (self, quality, width, height):
+    def cfgVideoBin (self, quality):
         vbenc = self.videobin.get_by_name("vbenc")
-        vbenc.set_property("quality", 16)
-        scaps = self.videobin.get_by_name("scalecaps")
-        scaps.set_property("caps", gst.Caps("video/x-raw-yuv,width=%d,height=%d" % (width, height)))
+        vbenc.set_property("quality", quality)
 
     def createPipeline ( self ):
         src = gst.element_factory_make("v4l2src", "camsrc")
@@ -196,7 +186,9 @@ class Glive:
 
         # important to place the framerate limit directly on the v4l2src
         # so that it gets communicated all the way down to the camera level
-        srccaps = gst.Caps('video/x-raw-yuv,framerate='+str(self.VIDEO_FRAMERATE_SMALL)+'/1')
+        srccapsfilter = gst.element_factory_make("capsfilter", "srccaps")
+        srccaps = gst.Caps('video/x-raw-yuv,width='+str(self.VIDEO_WIDTH_SMALL)+',height='+str(self.VIDEO_HEIGHT_SMALL)+',framerate='+str(self.VIDEO_FRAMERATE_SMALL)+'/1')
+        srccapsfilter.set_property("caps", srccaps)
 
         # we attempt to limit the framerate on the v4l2src directly, but we
         # can't trust this: perhaps we are falling behind in our capture,
@@ -205,7 +197,10 @@ class Glive:
         # for A/V sync because OGG does not store timestamps, it just stores
         # the FPS value.
         rate = gst.element_factory_make("videorate")
+
+        ratecapsfilter = gst.element_factory_make("capsfilter", "ratecaps")
         ratecaps = gst.Caps('video/x-raw-yuv,framerate='+str(self.VIDEO_FRAMERATE_SMALL)+'/1')
+        ratecapsfilter.set_property("caps", ratecaps)
 
         tee = gst.element_factory_make("tee", "tee")
         queue = gst.element_factory_make("queue", "dispqueue")
@@ -214,8 +209,8 @@ class Glive:
         queue.set_property("leaky", True)
         queue.set_property("max-size-buffers", 2)
 
-        self.pipeline.add(src, rate, tee, queue)
-        gst.element_link_many(src, srccaps, rate, ratecaps, tee, queue)
+        self.pipeline.add(src, srccapsfilter, rate, ratecapsfilter, tee, queue) 
+        gst.element_link_many(src, srccapsfilter, rate, ratecapsfilter, tee, queue)
 
         xvsink = gst.element_factory_make("xvimagesink", "xvsink")
         xv_available = xvsink.set_state(gst.STATE_PAUSED) != gst.STATE_CHANGE_FAILURE
@@ -229,6 +224,12 @@ class Glive:
             xsink = gst.element_factory_make("ximagesink")
             self.pipeline.add(cspace, xsink)
             gst.element_link_many(queue, cspace, xsink)
+
+
+    def cfgVideoSrc (self, width, height):
+        srccaps = self.pipeline.get_by_name("srccaps")
+        srccaps.set_property("caps", gst.Caps("video/x-raw-yuv,width=%d,height=%d" % (width, height)))
+
 
     def thumbPipe(self):
         return self.thumbPipes[ len(self.thumbPipes)-1 ]
@@ -407,15 +408,22 @@ class Glive:
             self.ca.m.savePhoto(pixbuf)
 
 
-    def startRecordingVideo(self, quality):
+    def changeVideoQuality(self, quality):
+        if not camera_presents:
+            return
+
+        self.ogg_quality = quality
+
+        self.cfgVideoBin (VIDEO_TRAITS[quality]['quality'])
+        self.cfgVideoSrc (OGG_TRAITS[quality]['width'],
+            OGG_TRAITS[quality]['height'])
+
+
+    def startRecordingVideo(self):
         if not camera_presents:
             return
 
         self.record = True
-        self.ogg_quality = quality
-        self.cfgVideoBin (OGG_TRAITS[quality]['quality'],
-            OGG_TRAITS[quality]['width'],
-            OGG_TRAITS[quality]['height'])
 
         # If we use pad blocking and adjust the pipeline on-the-fly, the
         # resultant video has bad A/V sync :(

@@ -37,7 +37,8 @@ import hippo
 import logging
 logger = logging.getLogger('record:ui.py')
 
-#from sugar.graphics.toolcombobox import ToolComboBox
+from sugar.graphics.toolcombobox import ToolComboBox
+from sugar.graphics.combobox import ComboBox
 #from sugar.graphics.tray import HTray
 from sugar.graphics.toolbutton import ToolButton
 from sugar import profile
@@ -141,6 +142,8 @@ class UI:
             self.toolbox.add_toolbar( Constants.istrPhoto, self.photoToolbar )
 
             self.videoToolbar = VideoToolbar()
+            self.videoToolbar.connect('quality-changed',
+                                      self._videoToolbarQualityChangedCb)
             self.videoToolbar.set_sensitive( False )
             self.toolbox.add_toolbar( Constants.istrVideo, self.videoToolbar )
 
@@ -933,8 +936,13 @@ class UI:
 
 
     def recordVideo( self ):
-        self.ca.glive.startRecordingVideo(self.videoToolbar.getQuality())
+        self.ca.glive.startRecordingVideo()
         self.beginRecordingTimer( )
+
+
+    def _videoToolbarQualityChangedCb( self, videoToolbar, quality ):
+        logger.debug('Video Quality Changed: %d' % quality)
+        self.ca.glive.changeVideoQuality( quality )
 
 
     def recordAudio( self ):
@@ -2331,6 +2339,12 @@ class PhotoToolbar(gtk.Toolbar):
 
 
 class VideoToolbar(gtk.Toolbar):
+    __gsignals__ = {
+        'quality-changed': (gobject.SIGNAL_RUN_FIRST,
+                            gobject.TYPE_NONE,
+                            ([int]))
+    }
+
     def __init__(self):
         gtk.Toolbar.__init__(self)
 
@@ -2348,12 +2362,14 @@ class VideoToolbar(gtk.Toolbar):
         self.insert(separator, -1)
         separator.show()
 
-        combo = gtk.combo_box_new_text()
+        # combo = gtk.combo_box_new_text()
+        combo = ComboBox()
         self.quality = ToolComboBox(combo=combo,
                 label_text=Constants.istrQuality+':')
-        self.quality.combo.append_text(Constants.istrLowQuality)
-        self.quality.combo.append_text(Constants.istrHighQuality)
-        self.quality.combo.append_text(Constants.istrBestQuality)
+        self.quality.combo.connect('changed', self._qualityChangedCb)
+        self.quality.combo.append_item(0, Constants.istrLowQuality)
+        self.quality.combo.append_item(1, Constants.istrHighQuality)
+        self.quality.combo.append_item(2, Constants.istrBestQuality)
         self.quality.combo.set_active(0)
         self.insert(self.quality, -1 )
 
@@ -2384,6 +2400,11 @@ class VideoToolbar(gtk.Toolbar):
     def _shutterClickCb(self, button):
         pass
         #self.ui.doShutter()
+
+
+    def _qualityChangedCb(self, widget):
+        logger.debug('VideoToolbar Quality Changed')
+        self.emit('quality-changed', self.getQuality())
 
 
     def getTimer(self):
