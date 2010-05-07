@@ -41,10 +41,10 @@ import record
 import utils
 import ui
 
-OGG_TRAITS = {
-        0: { 'width': 176, 'height': 144, 'quality': 16 },
-        1: { 'width': 320, 'height': 240, 'quality': 16 },
-        2: { 'width': 320, 'height': 240, 'quality': 32 } }
+VIDEO_TRAITS = {
+        0: { 'width': 176, 'height': 144, 'fps': 10, 'quality': 16 },
+        1: { 'width': 320, 'height': 240, 'fps': 10, 'quality': 16 },
+        2: { 'width': 320, 'height': 240, 'fps': 15, 'quality': 32 } }
 
 THUMB_STUB = gtk.gdk.pixbuf_new_from_file(
     os.path.join(get_bundle_path(), 'gfx', 'stub.png'))
@@ -226,9 +226,9 @@ class Glive:
             gst.element_link_many(queue, cspace, xsink)
 
 
-    def cfgVideoSrc (self, width, height):
+    def cfgVideoSrc (self, width, height, fps):
         srccaps = self.pipeline.get_by_name("srccaps")
-        srccaps.set_property("caps", gst.Caps("video/x-raw-yuv,width=%d,height=%d" % (width, height)))
+        srccaps.set_property("caps", gst.Caps("video/x-raw-yuv,width=%d,height=%d,framerate=%d/1" % (width, height, fps)))
 
 
     def thumbPipe(self):
@@ -415,8 +415,11 @@ class Glive:
         self.ogg_quality = quality
 
         self.cfgVideoBin (VIDEO_TRAITS[quality]['quality'])
-        self.cfgVideoSrc (OGG_TRAITS[quality]['width'],
-            OGG_TRAITS[quality]['height'])
+        self.cfgVideoSrc (VIDEO_TRAITS[quality]['width'],
+            VIDEO_TRAITS[quality]['height'],
+            VIDEO_TRAITS[quality]['fps'])
+        self.pipeline.set_state(gst.STATE_NULL)
+        self.pipeline.set_state(gst.STATE_PLAYING)
 
 
     def startRecordingVideo(self):
@@ -538,8 +541,8 @@ class Glive:
             muxFilepath = os.path.join(Instance.instancePath, "mux.ogg") #ogv
             os.remove( wavFilepath )
             os.remove( oggFilepath )
-            ogg_w = OGG_TRAITS[self.ogg_quality]['width']
-            ogg_h = OGG_TRAITS[self.ogg_quality]['height']
+            ogg_w = VIDEO_TRAITS[self.ogg_quality]['width']
+            ogg_h = VIDEO_TRAITS[self.ogg_quality]['height']
             self.ca.m.saveVideo(self.thumbBuf, str(muxFilepath), ogg_w, ogg_h)
             self.ca.m.stoppedRecordingVideo()
             return False
