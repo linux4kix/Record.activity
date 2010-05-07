@@ -128,6 +128,7 @@ class Glive:
         src.set_state(gst.STATE_NULL)
         if not hwdev_available:
             src.set_property("device", "default")
+        src.set_property("do-timestamp", True)
 
         srccaps = gst.Caps("audio/x-raw-int,rate=16000,channels=1,depth=16")
 
@@ -158,16 +159,18 @@ class Glive:
         enc = gst.element_factory_make("theoraenc", "vbenc")
         enc.set_property("quality", self.OGG_DEFAULT_QUALITY)
 
+        queue = gst.element_factory_make("queue")
+
         mux = gst.element_factory_make("oggmux", "vbmux")
 
         sink = gst.element_factory_make("filesink", "vbfile")
         sink.set_property("location", os.path.join(Instance.instancePath, "output.ogg"))
 
         self.videobin = gst.Bin("videobin")
-        self.videobin.add(colorspace, enc, mux, sink)
+        self.videobin.add(colorspace, enc, queue, mux, sink)
 
         colorspace.link_pads("src", enc, "sink")
-        gst.element_link_many(enc, mux, sink)
+        gst.element_link_many(enc, queue, mux, sink)
 
         pad = colorspace.get_static_pad("sink")
         self.videobin.add_pad(gst.GhostPad("sink", pad))
@@ -181,6 +184,7 @@ class Glive:
         try:
             # old gst-plugins-good does not have this property
             src.set_property("queue-size", 2)
+            src.set_property("do-timestamp", True)
         except:
             pass
 
@@ -325,7 +329,7 @@ class Glive:
 
             self.ca.ui.setPostProcessPixBuf(self.audioPixbuf)
 
-            line = 'filesrc location=' + str(audioFilepath) + ' name=audioFilesrc ! wavparse name=audioWavparse ! audioconvert name=audioAudioconvert ! vorbisenc name=audioVorbisenc ! oggmux name=audioOggmux ! filesink name=audioFilesink'
+            line = 'filesrc location=' + str(audioFilepath) + ' name=audioFilesrc ! wavparse name=audioWavparse ! queue ! audioconvert name=audioAudioconvert ! vorbisenc name=audioVorbisenc ! oggmux name=audioOggmux ! filesink name=audioFilesink'
             audioline = gst.parse_launch(line)
 
             taglist = self.getTags(Constants.TYPE_AUDIO)
@@ -489,7 +493,7 @@ class Glive:
         wavFilepath = os.path.join(Instance.instancePath, "output.wav")
         muxFilepath = os.path.join(Instance.instancePath, "mux.ogg") #ogv
 
-        muxline = gst.parse_launch('filesrc location=' + str(oggFilepath) + ' name=muxVideoFilesrc ! oggdemux name=muxOggdemux ! theoraparse ! oggmux name=muxOggmux ! filesink location=' + str(muxFilepath) + ' name=muxFilesink filesrc location=' + str(wavFilepath) + ' name=muxAudioFilesrc ! wavparse name=muxWavparse ! audioconvert name=muxAudioconvert ! vorbisenc name=muxVorbisenc ! muxOggmux.')
+        muxline = gst.parse_launch('filesrc location=' + str(oggFilepath) + ' name=muxVideoFilesrc ! oggdemux name=muxOggdemux ! theoraparse ! oggmux name=muxOggmux ! filesink location=' + str(muxFilepath) + ' name=muxFilesink filesrc location=' + str(wavFilepath) + ' name=muxAudioFilesrc ! wavparse name=muxWavparse ! queue ! audioconvert name=muxAudioconvert ! vorbisenc name=muxVorbisenc ! muxOggmux.')
         taglist = self.getTags(Constants.TYPE_VIDEO)
         vorbisEnc = muxline.get_by_name('muxVorbisenc')
         vorbisEnc.merge_tags(taglist, gst.TAG_MERGE_REPLACE_ALL)
