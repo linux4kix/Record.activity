@@ -139,6 +139,8 @@ class UI:
         if glive.camera_presents:
             self.photoToolbar = PhotoToolbar()
             self.photoToolbar.set_sensitive( False )
+            self.photoToolbar.connect('quality-changed',
+                                      self._photoToolbarQualityChangedCb)
             self.toolbox.add_toolbar( Constants.istrPhoto, self.photoToolbar )
 
             self.videoToolbar = VideoToolbar()
@@ -942,6 +944,11 @@ class UI:
 
     def _videoToolbarQualityChangedCb( self, videoToolbar, quality ):
         logger.debug('Video Quality Changed: %d' % quality)
+        self.ca.glive.changeVideoQuality( quality )
+
+
+    def _photoToolbarQualityChangedCb( self, photoToolbar, quality ):
+        logger.debug('Photo Quality Changed: %d' % quality)
         self.ca.glive.changeVideoQuality( quality )
 
 
@@ -2301,6 +2308,12 @@ class ProgressWindow(gtk.Window):
 
 
 class PhotoToolbar(gtk.Toolbar):
+    __gsignals__ = {
+        'quality-changed': (gobject.SIGNAL_RUN_FIRST,
+                            gobject.TYPE_NONE,
+                            ([int]))
+    }
+
     def __init__(self):
         gtk.Toolbar.__init__(self)
 
@@ -2318,6 +2331,17 @@ class PhotoToolbar(gtk.Toolbar):
         self.insert(separator, -1)
         separator.show()
 
+        # combo = gtk.combo_box_new_text()
+        combo = ComboBox()
+        self.quality = ToolComboBox(combo=combo,
+                label_text=Constants.istrQuality+':')
+        self.quality.combo.connect('changed', self._qualityChangedCb)
+        self.quality.combo.append_item(0, Constants.istrLowQuality)
+        self.quality.combo.append_item(1, Constants.istrHighQuality)
+        self.quality.combo.append_item(3, Constants.istrBestQuality)
+        self.quality.combo.set_active(0)
+        self.insert(self.quality, -1 )
+
         timerCbb = gtk.combo_box_new_text()
         self.timerCb = ToolComboBox(combo=timerCbb, label_text=Constants.istrTimer)
         for i in range (0, len(Constants.TIMERS)):
@@ -2334,8 +2358,17 @@ class PhotoToolbar(gtk.Toolbar):
         #self.ui.doShutter()
 
 
+    def _qualityChangedCb(self, widget):
+        logger.debug('Photo Quality Changed')
+        self.emit('quality-changed', self.getQuality())
+
+
     def getTimer(self):
         return Constants.TIMERS[self.timerCb.combo.get_active()]
+
+
+    def getQuality(self):
+        return self.quality.combo.get_active()
 
 
 class VideoToolbar(gtk.Toolbar):

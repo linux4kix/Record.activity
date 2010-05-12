@@ -44,7 +44,8 @@ import ui
 VIDEO_TRAITS = {
         0: { 'width': 176, 'height': 144, 'fps': 10, 'quality': 16 },
         1: { 'width': 320, 'height': 240, 'fps': 10, 'quality': 16 },
-        2: { 'width': 320, 'height': 240, 'fps': 15, 'quality': 32 } }
+        2: { 'width': 320, 'height': 240, 'fps': 15, 'quality': 32 },
+        3: { 'width': 640, 'height': 480, 'fps': 10, 'quality': 16 } }
 
 THUMB_STUB = gtk.gdk.pixbuf_new_from_file(
     os.path.join(get_bundle_path(), 'gfx', 'stub.png'))
