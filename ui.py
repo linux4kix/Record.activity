@@ -186,6 +186,7 @@ class UI:
 
         if self.photoToolbar:
             data['photo_timer'] = self.photoToolbar.timerCb.combo.get_active()
+            data['photo_quality'] = self.photoToolbar.quality.combo.get_active()
 
         if self.videoToolbar:
             data['video_timer'] = self.videoToolbar.timerCb.combo.get_active()
@@ -201,6 +202,8 @@ class UI:
         if self.photoToolbar:
             self.photoToolbar.timerCb.combo.set_active(
                     data.get('photo_timer', 0))
+            self.photoToolbar.quality.combo.set_active(
+                    data.get('photo_quality', 0))
 
         if self.videoToolbar:
             self.videoToolbar.timerCb.combo.set_active(
@@ -1475,6 +1478,12 @@ class UI:
 
         self.hideAllWindows()
         self.updatePos( pos )
+
+        if (self.LIVEMODE and not self.TRANSCODING):
+            if (self.ca.m.MODE == Constants.MODE_PHOTO):
+                self.ca.glive.changeVideoQuality(self.ca.ui.photoToolbar.getQuality())
+            elif (self.ca.m.MODE == Constants.MODE_VIDEO):
+                self.ca.glive.changeVideoQuality(self.ca.ui.videoToolbar.getQuality())
 
         for i in range (0, len(self.windowStack)):
             self.windowStack[i].show_all()
